@@ -1,4 +1,4 @@
-# telegram-sticker-thief-bot
+# (WIP)
 
 Sticker thieving bot for Telegram. Public instance: [@the_sticker_thief_bot](https://t.me/the_sticker_thief_bot)
 
@@ -21,6 +21,8 @@ Sticker thieving bot for Telegram. Public instance: [@the_sticker_thief_bot](htt
 telegram-sticker-thief-bot -token BOT_TOKEN
 
 Usage of telegram-sticker-thief-bot:
+  -rate-limit duration
+    	 (default 100ms)
   -timeout duration
     	 (default 2s)
   -token string

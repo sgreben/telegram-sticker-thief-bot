@@ -22,14 +22,14 @@ var config struct {
 	Verbose      bool
 }
 
-var name = "telegram-sticker-thief-bot"
+var appName = "telegram-sticker-thief-bot"
 var version = "dev"
 var jsonOut = json.NewEncoder(os.Stdout)
 
 func init() {
 	log.SetOutput(os.Stderr)
 	log.SetFlags(0)
-	log.SetPrefix(fmt.Sprintf("[%s %s] ", filepath.Base(name), version))
+	log.SetPrefix(fmt.Sprintf("[%s %s] ", filepath.Base(appName), version))
 
 	config.Timeout = 2 * time.Second
 	config.RateLimit = time.Second / 10

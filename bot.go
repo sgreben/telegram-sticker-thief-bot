@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/md5"
 	"encoding/json"
@@ -9,6 +10,8 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	"image/png"
+	"io"
+	"strings"
 	"time"
 
 	_ "golang.org/x/image/bmp"
@@ -32,9 +35,11 @@ type stickerThiefBot struct {
 
 func (bot *stickerThiefBot) init() {
 	bot.Handle("/start", bot.commandStart)
+	bot.Handle("/help", bot.commandHelp)
 	bot.Handle("/clone", bot.commandClone)
 	bot.Handle("/clear", bot.commandClear)
 	bot.Handle("/list", bot.commandList)
+	bot.Handle("/zip", bot.commandZip)
 	bot.Handle(telegram.OnSticker, printAndHandleMessage(bot.handleMessage))
 	bot.Handle(telegram.OnPhoto, printAndHandleMessage(bot.handleMessage))
 	bot.Handle(telegram.OnDocument, printAndHandleMessage(bot.handleMessage))
@@ -129,11 +134,17 @@ func (bot *stickerThiefBot) commandClone(m *telegram.Message) {
 	name := bot.stolenStickerSetName(m.Sender)
 	stickerSet, err := bot.getStickerSet(name)
 	if err != nil {
-		log.Printf("commandClear: %v", err)
+		log.Printf("commandClone: %v", err)
+		bot.Reply(m, fmt.Sprintf("ERROR: sticker set `%s` not found", name))
 	}
-	cloneName := bot.stickerSetName(fmt.Sprintf("%x%v", md5.Sum([]byte(m.Sender.Recipient())), m.Unixtime))
+	cloneNameHash := md5.Sum([]byte(fmt.Sprintf("%v%x%v", m.Unixtime, m.Sender.Recipient(), m.ID)))
+	cloneName := bot.stickerSetName(string(cloneNameHash[:]))
 	cover, _, _ := image.Decode(bytes.NewReader(initialStickerBytes))
 	cloneURL, err := bot.createNewStickerSet(m.Sender.Recipient(), cloneName, cover)
+	if err != nil {
+		log.Printf("commandClone: %v", err)
+		return
+	}
 	for _, sticker := range stickerSet.Stickers {
 		bot.addStickerToSet(m, telegram.Sticker{
 			File:    sticker.File,
@@ -141,7 +152,55 @@ func (bot *stickerThiefBot) commandClone(m *telegram.Message) {
 			SetName: cloneName,
 		})
 	}
-	bot.Reply(m, "clone: "+cloneURL, telegram.Silent)
+	reply, err := bot.Reply(m, "created clone: "+cloneURL, telegram.Silent)
+	if err != nil {
+		log.Printf("commandClone: %v", err)
+		return
+	}
+	jsonOut.Encode(reply)
+}
+
+func (bot *stickerThiefBot) commandZip(m *telegram.Message) {
+	name := m.Payload
+	name = strings.TrimPrefix(name, "https://")
+	name = strings.TrimPrefix(name, "http://")
+	name = strings.TrimPrefix(name, "t.me/addstickers/")
+	if name == "" {
+		name = bot.stolenStickerSetName(m.Sender)
+	}
+	stickerSet, err := bot.getStickerSet(name)
+	if err != nil {
+		log.Printf("commandZip: %v", err)
+		bot.Reply(m, fmt.Sprintf("ERROR: sticker set `%s` not found", name))
+		return
+	}
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+	for i, sticker := range stickerSet.Stickers {
+		reader, err := bot.GetFile(&sticker.File)
+		if err != nil {
+			log.Printf("commandZip: %v", err)
+			continue
+		}
+		w, err := zipWriter.Create(fmt.Sprintf("sticker-%03d.png", i))
+		if err != nil {
+			log.Printf("commandZip: %v", err)
+			continue
+		}
+		if _, err := io.Copy(w, reader); err != nil {
+			log.Printf("commandZip: %v", err)
+			continue
+		}
+	}
+	if err := zipWriter.Close(); err != nil {
+		log.Printf("commandZip: %v", err)
+	}
+	fileName := fmt.Sprintf("%s.zip", stickerSet.Name)
+	reply, err := bot.Reply(m, &telegram.Document{File: telegram.FromReader(&buf), FileName: fileName, MIME: "application/zip", Caption: stickerSet.Title})
+	if err != nil {
+		log.Printf("commandZip: %v", err)
+	}
+	jsonOut.Encode(reply)
 }
 
 func (bot *stickerThiefBot) commandClear(m *telegram.Message) {
@@ -154,6 +213,16 @@ func (bot *stickerThiefBot) commandClear(m *telegram.Message) {
 		bot.deleteStickerFromSet(sticker.FileID)
 	}
 	bot.Reply(m, "cleared "+stickerSetURL(name), telegram.Silent)
+}
+
+func (bot *stickerThiefBot) commandHelp(m *telegram.Message) {
+	bot.Reply(m, `
+/help
+/start             - Create your scratchpad sticker set
+/list              - List scratchpad stickers
+/clear             - Clear scratchpad sticker set
+/clone             - Make a permanent clone of the scratchpad sticker set
+/zip [STICKER_SET] - Download`)
 }
 
 func (bot *stickerThiefBot) commandList(m *telegram.Message) {

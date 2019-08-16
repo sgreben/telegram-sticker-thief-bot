@@ -40,7 +40,7 @@ func (b *Bot) Raw(method string, payload interface{}) ([]byte, error) {
 	return json, nil
 }
 
-func addFileToWriter(writer *multipart.Writer, fieldName string, file interface{}) error {
+func addFileToWriter(writer *multipart.Writer, fieldName string, file interface{}, fileName string) error {
 	var reader io.Reader
 	var part io.Writer
 	var err error
@@ -49,7 +49,7 @@ func addFileToWriter(writer *multipart.Writer, fieldName string, file interface{
 	if r, ok := file.(io.Reader); ok {
 		// Telegram requires fields to have a filename, otherwise
 		// `Bad Request: wrong URL host` would be returned
-		filename = "empty"
+		filename = fileName
 		reader = r
 	} else if path, ok := file.(string); ok {
 		f, err := os.Open(path)
@@ -107,7 +107,7 @@ func (b *Bot) sendFiles(
 	writer := multipart.NewWriter(body)
 
 	for field, file := range rawFiles {
-		if err := addFileToWriter(writer, field, file); err != nil {
+		if err := addFileToWriter(writer, field, file, files[field].FileName); err != nil {
 			return nil, wrapSystem(err)
 		}
 	}

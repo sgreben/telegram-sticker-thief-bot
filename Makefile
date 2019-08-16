@@ -1,4 +1,4 @@
-VERSION = 0.0.1
+VERSION = 0.0.2
 
 APP      := telegram-sticker-thief-bot
 PACKAGES := $(shell go list -f {{.Dir}} ./...)

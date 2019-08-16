@@ -84,10 +84,12 @@ func (d *Document) Send(b *Bot, to Recipient, opt *SendOptions) (*Message, error
 
 	if d.FileSize != 0 {
 		params["file_size"] = strconv.Itoa(d.FileSize)
+
 	}
 
 	embedSendOptions(params, opt)
 
+	d.File.FileName = d.FileName
 	msg, err := b.sendObject(&d.File, "document", params, thumbnailToFilemap(d.Thumbnail))
 	if err != nil {
 		return nil, err

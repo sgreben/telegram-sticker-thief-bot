@@ -10,7 +10,6 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	"image/png"
-	"io"
 	"strings"
 	"time"
 
@@ -76,11 +75,12 @@ func (bot *stickerThiefBot) stolenStickerSetName(u *telegram.User) string {
 
 func (bot *stickerThiefBot) stickerSetName(prefix string) string {
 	me := bot.Me.Username
-	maxLength := 64 - len(me) - 4 - 1
-	if len(prefix) > maxLength {
-		prefix = prefix[:maxLength]
+	name := fmt.Sprintf("x%s_by_%s", prefix, me)
+	if len(name) > 64 {
+		diff := len(name) - 64
+		name = fmt.Sprintf("x%s_by_%s", prefix[:len(prefix)-diff], me)
 	}
-	return fmt.Sprintf("x%s_by_%s", prefix, me)
+	return name
 }
 
 type createNewStickerSetRequest struct {
@@ -127,18 +127,21 @@ func (bot *stickerThiefBot) commandStart(m *telegram.Message) {
 		log.Printf("commandStart: %v", err)
 		return
 	}
-	bot.Reply(m, url, telegram.Silent)
+	bot.replyWithHelp(m, url, telegram.Silent)
 }
 
 func (bot *stickerThiefBot) commandClone(m *telegram.Message) {
-	name := bot.stolenStickerSetName(m.Sender)
+	name := stickerSetNameOfURL(m.Payload)
+	if m.Payload != "" {
+		name = bot.stolenStickerSetName(m.Sender)
+	}
 	stickerSet, err := bot.getStickerSet(name)
 	if err != nil {
 		log.Printf("commandClone: %v", err)
-		bot.Reply(m, fmt.Sprintf("ERROR: sticker set `%s` not found", name))
+		bot.replyWithHelp(m, fmt.Sprintf("ERROR: sticker set `%s` not found", name))
 	}
-	cloneNameHash := md5.Sum([]byte(fmt.Sprintf("%v%x%v", m.Unixtime, m.Sender.Recipient(), m.ID)))
-	cloneName := bot.stickerSetName(string(cloneNameHash[:]))
+	cloneNameHash := md5.Sum([]byte(fmt.Sprintf("%v%v%v", m.Unixtime, m.Sender.Recipient(), m.ID)))
+	cloneName := bot.stickerSetName(fmt.Sprintf("%x", cloneNameHash))
 	cover, _, _ := image.Decode(bytes.NewReader(initialStickerBytes))
 	cloneURL, err := bot.createNewStickerSet(m.Sender.Recipient(), cloneName, cover)
 	if err != nil {
@@ -152,7 +155,7 @@ func (bot *stickerThiefBot) commandClone(m *telegram.Message) {
 			SetName: cloneName,
 		})
 	}
-	reply, err := bot.Reply(m, "created clone: "+cloneURL, telegram.Silent)
+	reply, err := bot.replyWithHelp(m, "created clone: "+cloneURL, telegram.Silent)
 	if err != nil {
 		log.Printf("commandClone: %v", err)
 		return
@@ -160,18 +163,22 @@ func (bot *stickerThiefBot) commandClone(m *telegram.Message) {
 	jsonOut.Encode(reply)
 }
 
+func stickerSetNameOfURL(u string) string {
+	u = strings.TrimPrefix(u, "https://")
+	u = strings.TrimPrefix(u, "http://")
+	u = strings.TrimPrefix(u, "t.me/addstickers/")
+	return u
+}
+
 func (bot *stickerThiefBot) commandZip(m *telegram.Message) {
-	name := m.Payload
-	name = strings.TrimPrefix(name, "https://")
-	name = strings.TrimPrefix(name, "http://")
-	name = strings.TrimPrefix(name, "t.me/addstickers/")
+	name := stickerSetNameOfURL(m.Payload)
 	if name == "" {
 		name = bot.stolenStickerSetName(m.Sender)
 	}
 	stickerSet, err := bot.getStickerSet(name)
 	if err != nil {
 		log.Printf("commandZip: %v", err)
-		bot.Reply(m, fmt.Sprintf("ERROR: sticker set `%s` not found", name))
+		bot.replyWithHelp(m, fmt.Sprintf("ERROR: sticker set `%s` not found", name))
 		return
 	}
 	var buf bytes.Buffer
@@ -182,15 +189,21 @@ func (bot *stickerThiefBot) commandZip(m *telegram.Message) {
 			log.Printf("commandZip: %v", err)
 			continue
 		}
+		image, _, err := image.Decode(reader)
+		if err != nil {
+			log.Printf("commandZip: %v", err)
+			continue
+		}
 		w, err := zipWriter.Create(fmt.Sprintf("sticker-%03d.png", i))
 		if err != nil {
 			log.Printf("commandZip: %v", err)
 			continue
 		}
-		if _, err := io.Copy(w, reader); err != nil {
+		if err := png.Encode(w, image); err != nil {
 			log.Printf("commandZip: %v", err)
 			continue
 		}
+		reader.Close()
 	}
 	if err := zipWriter.Close(); err != nil {
 		log.Printf("commandZip: %v", err)
@@ -212,17 +225,20 @@ func (bot *stickerThiefBot) commandClear(m *telegram.Message) {
 	for _, sticker := range stickerSet.Stickers {
 		bot.deleteStickerFromSet(sticker.FileID)
 	}
-	bot.Reply(m, "cleared "+stickerSetURL(name), telegram.Silent)
+	bot.replyWithHelp(m, "cleared "+stickerSetURL(name), telegram.Silent)
+}
+
+func (bot *stickerThiefBot) replyWithHelp(m *telegram.Message, text string, options ...interface{}) (*telegram.Message, error) {
+	return bot.Reply(m, text+"\n/help", options...)
 }
 
 func (bot *stickerThiefBot) commandHelp(m *telegram.Message) {
-	bot.Reply(m, `
-/help
-/start             - Create your scratchpad sticker set
-/list              - List scratchpad stickers
-/clear             - Clear scratchpad sticker set
-/clone             - Make a permanent clone of the scratchpad sticker set
-/zip [STICKER_SET] - Download`)
+	bot.Reply(m, `/help
+/start - Create your scratchpad sticker set
+/list  - List scratchpad stickers
+/clear - Clear scratchpad sticker set
+/clone [STICKER_SET] - Make a permanent clone of the scratchpad sticker set, or the specified sticker set
+/zip [STICKER_SET] - Download the scratchpad sticker set, or the specified sticker set as a zip archive`)
 }
 
 func (bot *stickerThiefBot) commandList(m *telegram.Message) {

@@ -303,6 +303,8 @@ func (bot *stickerThiefBot) replyWithHelp(m *telegram.Message, text string, opti
 
 func (bot *stickerThiefBot) commandHelp(m *telegram.Message) {
 	bot.Reply(m, `/help
+Send/forward stickers and sticker set URLs to me to add them to your scratchpad sticker set!
+
 /start - Create your scratchpad sticker set
 /list  - List scratchpad stickers
 /clear - Clear scratchpad sticker set

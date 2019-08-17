@@ -1,6 +1,6 @@
 # telegram-sticker-thief-bot
 
-Sticker thieving bot for Telegram. Send it stickers to steal them :) Public instance: [@the_sticker_thief_bot](https://t.me/the_sticker_thief_bot)
+Sticker thieving bot for Telegram. Send it stickers (or sticker set URLs) to steal them :) Public instance: [@the_sticker_thief_bot](https://t.me/the_sticker_thief_bot)
 
 ## Contents
 

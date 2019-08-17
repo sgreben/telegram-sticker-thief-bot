@@ -52,6 +52,18 @@ func (bot *stickerThiefBot) init() {
 		}
 		bot.replyWithHelp(c.Message, "removed sticker from its set", telegram.Silent)
 	})
+	bot.Handle(telegram.OnText, func(m *telegram.Message) {
+		if isStickerSetURL(m.Text) {
+			m.Payload = m.Text
+			bot.commandSteal(m)
+		}
+		for _, entity := range m.Entities {
+			if isStickerSetURL(entity.URL) {
+				m.Payload = entity.URL
+				bot.commandSteal(m)
+			}
+		}
+	})
 
 	// fallback action: just print (if verbose=true)
 	bot.Handle(telegram.OnAddedToGroup, printAndHandleMessage(nil))
@@ -69,7 +81,6 @@ func (bot *stickerThiefBot) init() {
 	bot.Handle(telegram.OnNewGroupTitle, printAndHandleMessage(nil))
 	bot.Handle(telegram.OnPinned, printAndHandleMessage(nil))
 	bot.Handle(telegram.OnQuery, printAndHandleMessage(nil))
-	bot.Handle(telegram.OnText, printAndHandleMessage(nil))
 	bot.Handle(telegram.OnUserJoined, printAndHandleMessage(nil))
 	bot.Handle(telegram.OnUserLeft, printAndHandleMessage(nil))
 	bot.Handle(telegram.OnVenue, printAndHandleMessage(nil))
@@ -196,7 +207,7 @@ func (bot *stickerThiefBot) commandSteal(m *telegram.Message) {
 		bot.replyWithHelp(m, fmt.Sprintf("sticker set `%s` is empty. not stealing.", fromName))
 		return
 	}
-	for _, sticker := range sourceStickerSet.Stickers[1:] {
+	for _, sticker := range sourceStickerSet.Stickers {
 		bot.addStickerToSet(m, telegram.Sticker{
 			File:    sticker.File,
 			Emoji:   sticker.Emoji,
@@ -211,6 +222,16 @@ func (bot *stickerThiefBot) commandSteal(m *telegram.Message) {
 	jsonOut.Encode(reply)
 }
 
+func isStickerSetURL(u string) bool {
+	switch {
+	case strings.HasPrefix(u, "https://t.me/addstickers/"),
+		strings.HasPrefix(u, "http://t.me/addstickers/"),
+		strings.HasPrefix(u, "t.me/addstickers/"):
+		return true
+	default:
+		return false
+	}
+}
 func stickerSetNameOfURL(u string) string {
 	u = strings.TrimPrefix(u, "https://")
 	u = strings.TrimPrefix(u, "http://")

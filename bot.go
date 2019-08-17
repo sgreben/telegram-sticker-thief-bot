@@ -132,7 +132,7 @@ func (bot *stickerThiefBot) commandStart(m *telegram.Message) {
 
 func (bot *stickerThiefBot) commandClone(m *telegram.Message) {
 	name := stickerSetNameOfURL(m.Payload)
-	if m.Payload != "" {
+	if m.Payload == "" {
 		name = bot.stolenStickerSetName(m.Sender)
 	}
 	stickerSet, err := bot.getStickerSet(name)

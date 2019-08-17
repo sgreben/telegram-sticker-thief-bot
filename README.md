@@ -9,6 +9,15 @@ Sticker thieving bot for Telegram. Send it stickers to steal them :) Public inst
 
 ## Usage
 
+### Telegram
+
+- `/help`: Print help
+- `/start`: Create your scratchpad sticker set
+- `/list` : List scratchpad stickers
+- `/clear`: Clear scratchpad sticker set
+- `/clone` `[STICKER_SET]`: Make a permanent clone of the scratchpad sticker set, or the specified sticker set
+- `/zip` `[STICKER_SET]`: Download the scratchpad sticker set, or the specified sticker set as a zip archive
+
 ### CLI
 
 ```text

@@ -1,4 +1,4 @@
-# (WIP)
+# ${APP}
 
 Sticker thieving bot for Telegram. Public instance: [@the_sticker_thief_bot](https://t.me/the_sticker_thief_bot)
 
@@ -8,12 +8,6 @@ Sticker thieving bot for Telegram. Public instance: [@the_sticker_thief_bot](htt
 - [Get it](#get-it)
 
 ## Usage
-
-### Telegram
-
-1. Send the bot a sticker
-2. The bot replies with a file
-3. Forward the file to @Stickers
 
 ### CLI
 

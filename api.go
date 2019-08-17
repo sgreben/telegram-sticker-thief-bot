@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -36,15 +37,26 @@ func (bot *stickerThiefBot) deleteStickerFromSet(stickerFileID string) error {
 
 func (bot *stickerThiefBot) sendSticker(to telegram.Recipient, stickerFileID string, replyToMessageID int) (*telegram.Message, error) {
 	type sendStickerRequest struct {
-		ChatID              string `json:"chat_id"`
-		Sticker             string `json:"sticker"`
-		DisableNotification bool   `json:"disable_notification,omitempty"`
-		ReplyToMessageID    int    `json:"reply_to_message_id,omitempty"`
+		ChatID              string               `json:"chat_id"`
+		Sticker             string               `json:"sticker"`
+		DisableNotification bool                 `json:"disable_notification,omitempty"`
+		ReplyToMessageID    int                  `json:"reply_to_message_id,omitempty"`
+		ReplyMarkup         telegram.ReplyMarkup `json:"reply_markup"`
 	}
+	unique := fmt.Sprintf("%x", md5.Sum([]byte(stickerFileID+to.Recipient())))
 	resp, err := bot.Raw("sendSticker", sendStickerRequest{
 		ChatID:           to.Recipient(),
 		Sticker:          stickerFileID,
 		ReplyToMessageID: replyToMessageID,
+		ReplyMarkup: telegram.ReplyMarkup{
+			InlineKeyboard: [][]telegram.InlineButton{{
+				{
+					Unique: unique,
+					Data:   stickerFileID,
+					Text:   "Remove from set",
+				},
+			}},
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("sendSticker: %v", err)

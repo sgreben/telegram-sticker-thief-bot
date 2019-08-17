@@ -43,11 +43,19 @@ func (bot *stickerThiefBot) init() {
 	bot.Handle(telegram.OnSticker, printAndHandleMessage(bot.handleMessage))
 	bot.Handle(telegram.OnPhoto, printAndHandleMessage(bot.handleMessage))
 	bot.Handle(telegram.OnDocument, printAndHandleMessage(bot.handleMessage))
+	bot.Handle(telegram.OnCallback, func(c *telegram.Callback) {
+		i := strings.IndexRune(c.Data, '|')
+		data := c.Data[i+1:]
+		if err := bot.deleteStickerFromSet(data); err != nil {
+			log.Printf("callback: %v", err)
+			bot.replyWithHelp(c.Message, fmt.Sprintf("ERROR: %v", err), telegram.Silent)
+		}
+		bot.replyWithHelp(c.Message, "removed sticker from its set", telegram.Silent)
+	})
 
 	// fallback action: just print (if verbose=true)
 	bot.Handle(telegram.OnAddedToGroup, printAndHandleMessage(nil))
 	bot.Handle(telegram.OnAudio, printAndHandleMessage(nil))
-	bot.Handle(telegram.OnCallback, printAndHandleMessage(nil))
 	bot.Handle(telegram.OnChannelPost, printAndHandleMessage(nil))
 	bot.Handle(telegram.OnCheckout, printAndHandleMessage(nil))
 	bot.Handle(telegram.OnChosenInlineResult, printAndHandleMessage(nil))

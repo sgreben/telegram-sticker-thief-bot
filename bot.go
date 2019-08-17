@@ -36,6 +36,7 @@ func (bot *stickerThiefBot) init() {
 	bot.Handle("/start", bot.commandStart)
 	bot.Handle("/help", bot.commandHelp)
 	bot.Handle("/clone", bot.commandClone)
+	bot.Handle("/steal", bot.commandSteal)
 	bot.Handle("/clear", bot.commandClear)
 	bot.Handle("/list", bot.commandList)
 	bot.Handle("/zip", bot.commandZip)
@@ -140,15 +141,24 @@ func (bot *stickerThiefBot) commandClone(m *telegram.Message) {
 		log.Printf("commandClone: %v", err)
 		bot.replyWithHelp(m, fmt.Sprintf("ERROR: sticker set `%s` not found", name))
 	}
+	if len(stickerSet.Stickers) == 0 {
+		bot.replyWithHelp(m, fmt.Sprintf("sticker set `%s` is empty. not cloning.", name))
+		return
+	}
 	cloneNameHash := md5.Sum([]byte(fmt.Sprintf("%v%v%v", m.Unixtime, m.Sender.Recipient(), m.ID)))
 	cloneName := bot.stickerSetName(fmt.Sprintf("%x", cloneNameHash))
-	cover, _, _ := image.Decode(bytes.NewReader(initialStickerBytes))
+	coverReader, err := bot.GetFile(&stickerSet.Stickers[0].File)
+	if err != nil {
+		log.Printf("commandClone: %v", err)
+		return
+	}
+	cover, _, _ := image.Decode(coverReader)
 	cloneURL, err := bot.createNewStickerSet(m.Sender.Recipient(), cloneName, cover)
 	if err != nil {
 		log.Printf("commandClone: %v", err)
 		return
 	}
-	for _, sticker := range stickerSet.Stickers {
+	for _, sticker := range stickerSet.Stickers[1:] {
 		bot.addStickerToSet(m, telegram.Sticker{
 			File:    sticker.File,
 			Emoji:   sticker.Emoji,
@@ -158,6 +168,36 @@ func (bot *stickerThiefBot) commandClone(m *telegram.Message) {
 	reply, err := bot.replyWithHelp(m, "created clone: "+cloneURL, telegram.Silent)
 	if err != nil {
 		log.Printf("commandClone: %v", err)
+		return
+	}
+	jsonOut.Encode(reply)
+}
+
+func (bot *stickerThiefBot) commandSteal(m *telegram.Message) {
+	if m.Payload == "" {
+		bot.replyWithHelp(m, fmt.Sprintf("ERROR: sticker set not specified"))
+	}
+	fromName := stickerSetNameOfURL(m.Payload)
+	toName := bot.stolenStickerSetName(m.Sender)
+	sourceStickerSet, err := bot.getStickerSet(fromName)
+	if err != nil {
+		log.Printf("commandSteal: %v", err)
+		bot.replyWithHelp(m, fmt.Sprintf("ERROR: sticker set `%s` not found", fromName))
+	}
+	if len(sourceStickerSet.Stickers) == 0 {
+		bot.replyWithHelp(m, fmt.Sprintf("sticker set `%s` is empty. not stealing.", fromName))
+		return
+	}
+	for _, sticker := range sourceStickerSet.Stickers[1:] {
+		bot.addStickerToSet(m, telegram.Sticker{
+			File:    sticker.File,
+			Emoji:   sticker.Emoji,
+			SetName: toName,
+		})
+	}
+	reply, err := bot.replyWithHelp(m, "added all stickers to scratchpad.", telegram.Silent)
+	if err != nil {
+		log.Printf("commandSteal: %v", err)
 		return
 	}
 	jsonOut.Encode(reply)
@@ -238,6 +278,7 @@ func (bot *stickerThiefBot) commandHelp(m *telegram.Message) {
 /list  - List scratchpad stickers
 /clear - Clear scratchpad sticker set
 /clone [STICKER_SET] - Make a permanent clone of the scratchpad sticker set, or the specified sticker set
+/steal STICKER_SET - Add all stickers from this set to the scratchpad sticker set
 /zip [STICKER_SET] - Download the scratchpad sticker set, or the specified sticker set as a zip archive`)
 }
 

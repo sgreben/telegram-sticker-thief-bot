@@ -5,6 +5,8 @@ Sticker thieving bot for Telegram. Send it stickers to steal them :) Public inst
 ## Contents
 
 - [Usage](#usage)
+  - [Telegram](#telegram)
+  - [CLI](#cli)
 - [Get it](#get-it)
 
 ## Usage
